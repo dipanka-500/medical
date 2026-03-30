@@ -28,6 +28,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 logging.basicConfig(
@@ -64,9 +65,9 @@ MODELS: list[tuple[str, str, float, str, str]] = [
      "Google's medical vision-language model"),
     ("chexagent_3b", "StanfordAIMI/CheXagent-2-3b", 6.0, "medical",
      "Chest X-ray specialist with grounding"),
-    ("retfound", "TJU-DRL-LAB/RETFound", 1.0, "medical",
+    ("retfound", "RETFound/RETFound", 1.0, "medical",
      "Retinal/OCT image specialist"),
-    ("mellama_13b", "clinicalnlplab/Me-LLaMA-13b", 26.0, "medical",
+    ("mellama_13b", "clinicalnlplab/me-llama", 26.0, "medical",
      "Conversational medical Q&A"),
     ("chatdoctor", "zl111/ChatDoctor", 14.0, "medical",
      "Patient-facing medical assistant"),
@@ -138,32 +139,46 @@ def download_model(
     """Download a single model from HuggingFace Hub."""
     try:
         from huggingface_hub import snapshot_download
-
-        logger.info("  Downloading %s ...", repo_id)
-        snapshot_download(
-            repo_id=repo_id,
-            cache_dir=models_dir,
-            token=token,
-            # Resume interrupted downloads
-            resume_download=True,
-            # Ignore patterns that aren't needed for inference
-            ignore_patterns=[
-                "*.md", "*.txt", "*.gitattributes",
-                "*.msgpack", "*.h5",       # TF/Flax weights (we only need PyTorch)
-                "training_args.bin",
-                "optimizer.pt",
-                "scheduler.pt",
-                "flax_model*",
-                "tf_model*",
-                "rust_model*",
-            ],
-        )
-        logger.info("  Done: %s", repo_id)
-        return True
-
     except Exception as e:
-        logger.error("  FAILED: %s — %s", repo_id, e)
+        logger.error("  FAILED: huggingface_hub import error — %s", e)
         return False
+
+    max_attempts = int(os.environ.get("HF_DOWNLOAD_RETRIES", "3"))
+    etag_timeout = float(os.environ.get("HF_HUB_ETAG_TIMEOUT", "60"))
+    max_workers = int(os.environ.get("HF_SNAPSHOT_MAX_WORKERS", "4"))
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            logger.info("  Downloading %s ... (attempt %d/%d)", repo_id, attempt, max_attempts)
+            snapshot_download(
+                repo_id=repo_id,
+                cache_dir=models_dir,
+                token=token,
+                resume_download=True,
+                etag_timeout=etag_timeout,
+                max_workers=max_workers,
+                # Ignore patterns that aren't needed for inference
+                ignore_patterns=[
+                    "*.md", "*.txt", "*.gitattributes",
+                    "*.msgpack", "*.h5",       # TF/Flax weights (we only need PyTorch)
+                    "training_args.bin",
+                    "optimizer.pt",
+                    "scheduler.pt",
+                    "flax_model*",
+                    "tf_model*",
+                    "rust_model*",
+                ],
+            )
+            logger.info("  Done: %s", repo_id)
+            return True
+        except Exception as e:
+            if attempt >= max_attempts:
+                logger.error("  FAILED: %s — %s", repo_id, e)
+                return False
+            logger.warning("  Retry %d/%d for %s after error: %s", attempt, max_attempts, repo_id, e)
+            time.sleep(min(5 * attempt, 15))
+
+    return False
 
 
 def main():

@@ -58,7 +58,7 @@ htmlcov/
 data/
 logs/
 outputs/
-models/
+/models/
 *.faiss
 
 # ── Uploads / Temp ───────────────────────────────────────────────

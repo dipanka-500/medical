@@ -56,7 +56,7 @@ models:
 
   mellama_13b:
     # NOTE: The original Me-LLaMA lives under clinicalnlplab, not meta-llama
-    model_id: "clinicalnlplab/Me-LLaMA-13b"
+    model_id: "clinicalnlplab/me-llama"
     role: "conversational"
     description: "Conversational medical Q&A"
     max_new_tokens: 2048

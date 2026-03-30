@@ -149,18 +149,18 @@ models:
     supported_modalities: ["xray"]
     priority: 2
 
-  # ── PathGen-1.6B (Pathology) ──────────────────────── [NEW]
+  # ── PathGen-CLIP-L (Pathology) ────────────────────── [NEW]
   pathgen:
-    model_id: "PathGen/PathGen-1.6B"
-    model_class: "LlavaForConditionalGeneration"
-    processor_class: "AutoProcessor"
+    model_id: "jamessyx/pathgenclip-vit-large-patch14-hf"
+    model_class: "open_clip"
+    runtime_mode: "clip"
     capabilities: ["image"]
     supported_modalities: ["pathology", "cytology", "histopathology"]
     priority: 1
 
   # ── RETFound (Retinal Foundation Model) ───────────── [NEW]
   retfound:
-    model_id: "TJU-DRL-LAB/RETFound"
+    model_id: "RETFound/RETFound"
     model_class: "ViTModel"
     capabilities: ["classification", "feature_extraction"]
     supported_modalities: ["fundoscopy", "oct"]

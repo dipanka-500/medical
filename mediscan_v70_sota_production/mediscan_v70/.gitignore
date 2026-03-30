@@ -33,7 +33,7 @@ data/
 *.ndpi
 
 # Model weights (download at runtime)
-models/
+/models/
 *.bin
 *.safetensors
 *.pt
