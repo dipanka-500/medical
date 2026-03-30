@@ -1,0 +1,28 @@
+defaults:
+  device_map: "auto"
+  torch_dtype: "float16"
+  trust_remote_code: false
+  max_new_tokens: 2048
+  temperature: 0.3
+  top_p: 0.9
+  repetition_penalty: 1.1
+  do_sample: true
+  use_vllm: false
+
+models:
+  biomistral_7b:
+    model_id: "BioMistral/BioMistral-7B"
+    role: "fast_engine"
+    description: "Lightweight medical Q&A engine for the Jarvis text stack"
+    max_new_tokens: 2048
+    temperature: 0.3
+    weight: 1.0
+
+embedding:
+  model_id: "BAAI/bge-large-en-v1.5"
+  device: "cuda"
+  batch_size: 32
+  normalize: true
+
+priority_order:
+  - biomistral_7b

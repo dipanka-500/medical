@@ -1,0 +1,131 @@
+routing:
+  min_models_per_task: 1
+  max_models_per_task: 1
+  enable_smart_routing: true
+  routing_table:
+    simple_qa:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+    diagnosis:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+    differential:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+    treatment:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+    drug_info:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+    lab_interpretation:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+    research:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+    conversational:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+    emergency:
+      primary: ["biomistral_7b"]
+      medical: []
+      verifier: []
+      reasoning: []
+
+rag:
+  embedding_model: "BAAI/bge-large-en-v1.5"
+  vector_store: "faiss"
+  persist_dir: "./data/rag/faiss_index"
+  chunk_size: 512
+  chunk_overlap: 64
+  top_k: 5
+  relevance_threshold: 0.55
+  enable_web_search: false
+  enable_pubmed: false
+
+fusion:
+  strategy: "weighted_consensus"
+  confidence_weights:
+    reasoning_score: 0.5
+    medical_score: 0.3
+    evidence_score: 0.2
+  agreement_threshold: 0.5
+  min_confidence: 0.2
+
+safety:
+  enable_hallucination_check: true
+  enable_drug_interaction_check: true
+  enable_clinical_validation: true
+  enable_risk_flagging: true
+  max_hallucination_tolerance: 0.4
+  risk_levels:
+    emergent:
+      - "cardiac arrest"
+      - "stroke"
+      - "anaphylaxis"
+      - "suicide"
+      - "overdose"
+    urgent:
+      - "fracture"
+      - "pneumonia"
+      - "appendicitis"
+      - "meningitis"
+    routine:
+      - "chronic pain"
+      - "stable condition"
+      - "benign lesion"
+
+execution:
+  max_concurrent_models: 1
+  model_timeout_seconds: 180
+  enable_parallel: false
+  retry_on_failure: true
+  max_retries: 1
+  lazy_loading:
+    max_resident_models: 1
+    auto_unload_after_inference: false
+    sequential_heavy_models: false
+
+response:
+  default_mode: "doctor"
+  include_evidence: true
+  include_confidence: true
+  include_reasoning: true
+  max_response_length: 2048
+  structured_sections:
+    - "diagnosis"
+    - "confidence"
+    - "evidence"
+    - "recommended_tests"
+    - "treatment_options"
+    - "risk_level"
+    - "doctor_advice"
+
+governance:
+  audit:
+    enabled: true
+    enable_detailed: true
+    enable_console: false
+    log_dir: "./logs/audit"
+    retain_days: 30
+  explainability:
+    enabled: true
+    show_reasoning_chain: true
+    show_model_contributions: true
