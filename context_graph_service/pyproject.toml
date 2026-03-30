@@ -22,3 +22,9 @@ dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
 ]
+
+[tool.setuptools]
+packages = ["context_graph_service"]
+
+[tool.setuptools.package-dir]
+context_graph_service = "."

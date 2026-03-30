@@ -113,7 +113,7 @@ MEDICAL_LLM_MODEL_CONFIG_PATH="$(resolve_path "${MEDICAL_LLM_MODEL_CONFIG:-medic
 
 start_postgres() {
   if [[ -z "$INITDB_BIN" || -z "$PG_CTL_BIN" || -z "$PG_ISREADY_BIN" || -z "$CREATEDB_BIN" ]]; then
-    echo "PostgreSQL binaries not found. Install them first." >&2
+    echo "PostgreSQL binaries not found. Run deployment/jarvislabs/bootstrap_host.sh first." >&2
     exit 1
   fi
 

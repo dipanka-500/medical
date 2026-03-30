@@ -23,3 +23,9 @@ full = [
 dev = [
     "pytest>=7.0",
 ]
+
+[tool.setuptools]
+packages = ["context1_agent"]
+
+[tool.setuptools.package-dir]
+context1_agent = "."

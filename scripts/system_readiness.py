@@ -805,17 +805,24 @@ class ReadinessHarness:
         email = self.args.auth_email or f"readiness+{int(time.time())}@example.com"
         password = self.args.auth_password
 
-        register_status, register_body = request_json(
-            "POST",
-            f"{self.platform_url}/api/v1/auth/register",
-            payload={
-                "email": email,
-                "password": password,
-                "full_name": "Readiness Probe",
-                "role": "patient",
-            },
-            timeout=max(self.args.timeout, 60.0),
-        )
+        try:
+            register_status, register_body = request_json(
+                "POST",
+                f"{self.platform_url}/api/v1/auth/register",
+                payload={
+                    "email": email,
+                    "password": password,
+                    "full_name": "Readiness Probe",
+                    "role": "patient",
+                },
+                timeout=max(self.args.timeout, 60.0),
+            )
+        except Exception as exc:
+            return CheckResult(
+                "live.platform",
+                "fail",
+                f"Platform probe failed before register: {exc}",
+            )
         if register_status not in {201, 409}:
             return CheckResult(
                 "live.platform",
@@ -824,12 +831,19 @@ class ReadinessHarness:
                 details={"payload": register_body},
             )
 
-        login_status, login_body = request_json(
-            "POST",
-            f"{self.platform_url}/api/v1/auth/login",
-            payload={"email": email, "password": password},
-            timeout=max(self.args.timeout, 60.0),
-        )
+        try:
+            login_status, login_body = request_json(
+                "POST",
+                f"{self.platform_url}/api/v1/auth/login",
+                payload={"email": email, "password": password},
+                timeout=max(self.args.timeout, 60.0),
+            )
+        except Exception as exc:
+            return CheckResult(
+                "live.platform",
+                "fail",
+                f"Platform probe failed before login: {exc}",
+            )
         if login_status != 200 or not isinstance(login_body, dict):
             return CheckResult(
                 "live.platform",
@@ -848,12 +862,19 @@ class ReadinessHarness:
             )
 
         auth_headers = {"Authorization": f"Bearer {access_token}"}
-        me_status, me_body = request_json(
-            "GET",
-            f"{self.platform_url}/api/v1/auth/me",
-            headers=auth_headers,
-            timeout=max(self.args.timeout, 60.0),
-        )
+        try:
+            me_status, me_body = request_json(
+                "GET",
+                f"{self.platform_url}/api/v1/auth/me",
+                headers=auth_headers,
+                timeout=max(self.args.timeout, 60.0),
+            )
+        except Exception as exc:
+            return CheckResult(
+                "live.platform",
+                "fail",
+                f"Platform probe failed before /auth/me: {exc}",
+            )
         if me_status != 200 or not isinstance(me_body, dict):
             return CheckResult(
                 "live.platform",
@@ -863,19 +884,26 @@ class ReadinessHarness:
             )
 
         patient_id = str(me_body.get("id") or uuid.uuid4())
-        ask_status, ask_body = request_json(
-            "POST",
-            f"{self.platform_url}/api/v1/chat/ask",
-            payload={
-                "query": "Give me a short greeting and tell me what you can do.",
-                "mode": "patient",
-                "patient_id": patient_id,
-                "web_search": env_bool(self.env.get("ENABLE_OPENRAG")),
-                "deep_reasoning": env_bool(self.env.get("ENABLE_CONTEXT1_AGENT")),
-            },
-            headers=auth_headers,
-            timeout=max(self.args.timeout, 180.0),
-        )
+        try:
+            ask_status, ask_body = request_json(
+                "POST",
+                f"{self.platform_url}/api/v1/chat/ask",
+                payload={
+                    "query": "Give me a short greeting and tell me what you can do.",
+                    "mode": "patient",
+                    "patient_id": patient_id,
+                    "web_search": env_bool(self.env.get("ENABLE_OPENRAG")),
+                    "deep_reasoning": env_bool(self.env.get("ENABLE_CONTEXT1_AGENT")),
+                },
+                headers=auth_headers,
+                timeout=max(self.args.timeout, 180.0),
+            )
+        except Exception as exc:
+            return CheckResult(
+                "live.platform",
+                "fail",
+                f"Platform probe failed before /chat/ask: {exc}",
+            )
         if ask_status != 200 or not isinstance(ask_body, dict):
             return CheckResult(
                 "live.platform",
