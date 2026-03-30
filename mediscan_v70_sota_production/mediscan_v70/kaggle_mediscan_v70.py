@@ -2116,7 +2116,7 @@ class MediScanKaggleEngine:
         self.models = {}
         gpu0, gpu1 = 0, min(1, NUM_GPUS - 1)
         self.models["hulu_med_7b"] = HuluMedKaggle("ZJU-AI4H/Hulu-Med-4B", device_idx=gpu0)
-        self.models["medgemma_4b"] = MedGemmaKaggle("google/medgemma-1.5-4b-it", device_idx=gpu0)
+        self.models["medgemma_4b"] = MedGemmaKaggle("google/medgemma-4b-it", device_idx=gpu0)
         self.models["medix_r1_2b"] = MediXR1Kaggle("MBZUAI/MediX-R1-2B", device_idx=gpu1)
         self.models["med3dvlm"] = Med3DVLMKaggle("MagicXin/Med3DVLM-Qwen-2.5-7B", device_idx=gpu1)
         self.models["biomedclip"] = BiomedCLIPKaggle("hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224", device_idx=gpu1)

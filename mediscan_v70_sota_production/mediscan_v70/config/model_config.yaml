@@ -52,7 +52,7 @@ models:
 
   # ── MedGemma Family ────────────────────────────────────────
   medgemma_4b:
-    model_id: "google/medgemma-1.5-4b-it"
+    model_id: "google/medgemma-4b-it"
     model_class: "AutoModelForImageTextToText"
     processor_class: "AutoProcessor"
     capabilities: ["text", "image"]

@@ -54,13 +54,13 @@ MODELS: list[tuple[str, str, float, str, str]] = [
      "Zero-shot medical image classification"),
     ("firered_ocr", "FireRedTeam/FireRed-OCR", 8.0, "core",
      "Document & medical form OCR"),
-    ("pathgen", "PathGen/PathGen-1.6B", 3.0, "core",
-     "Pathology image analysis"),
+    ("pathgen", "jamessyx/pathgenclip-vit-large-patch14-hf", 3.5, "core",
+     "PathGen-CLIP-L HF checkpoint for pathology image analysis"),
 
     # ── Tier 2: Medical Specialists (recommended) ────────────────────
     ("medix_r1_2b", "MBZUAI/MediX-R1-2B", 4.0, "medical",
      "Lightweight medical vision reasoning"),
-    ("medgemma_4b", "google/medgemma-1.5-4b-it", 8.0, "medical",
+    ("medgemma_4b", "google/medgemma-4b-it", 8.0, "medical",
      "Google's medical vision-language model"),
     ("chexagent_3b", "StanfordAIMI/CheXagent-2-3b", 6.0, "medical",
      "Chest X-ray specialist with grounding"),
