@@ -605,6 +605,84 @@ def create_app(api_settings: Optional[APISettings] = None) -> FastAPI:
             "request_limiter": await app.state.request_limiter.get_stats(),
         }
 
+    @app.get("/models")
+    async def list_models(
+        x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+    ) -> Dict[str, Any]:
+        """List registered model status for operators."""
+        await require_api_key(x_api_key)
+        await ensure_engine_initialized()
+        return {
+            "status": "ok",
+            "models": app.state.engine.get_model_status(),
+        }
+
+    @app.post("/models/{model_key}/load")
+    async def load_model(
+        model_key: str,
+        x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+    ) -> Dict[str, Any]:
+        """Explicitly load a registered model into memory."""
+        await require_api_key(x_api_key)
+        await ensure_engine_initialized()
+
+        models = app.state.engine.get_model_status()
+        if model_key not in models:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Model not found: {model_key}",
+            )
+
+        loaded = await run_in_threadpool(app.state.engine.load_model, model_key)
+        if not loaded:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to load model: {model_key}",
+            )
+
+        return {
+            "status": "loaded",
+            "model": model_key,
+            "models": app.state.engine.get_model_status(),
+        }
+
+    @app.post("/models/{model_key}/unload")
+    async def unload_model(
+        model_key: str,
+        x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+    ) -> Dict[str, Any]:
+        """Explicitly unload a registered model from memory."""
+        await require_api_key(x_api_key)
+        await ensure_engine_initialized()
+
+        models = app.state.engine.get_model_status()
+        if model_key not in models:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Model not found: {model_key}",
+            )
+
+        await run_in_threadpool(app.state.engine.unload_model, model_key)
+        return {
+            "status": "unloaded",
+            "model": model_key,
+            "models": app.state.engine.get_model_status(),
+        }
+
+    @app.post("/models/unload-all")
+    async def unload_all_models(
+        x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+    ) -> Dict[str, Any]:
+        """Unload all registered models from memory."""
+        await require_api_key(x_api_key)
+        await ensure_engine_initialized()
+        await run_in_threadpool(app.state.engine.unload_all)
+        return {
+            "status": "unloaded",
+            "model": "*",
+            "models": app.state.engine.get_model_status(),
+        }
+
     @app.post("/analyze")
     async def analyze(
         request: AnalyzeRequest,

@@ -194,7 +194,7 @@ start_cache() {
 
 wait_for_http() {
   local url="$1"
-  for _ in $(seq 1 120); do
+  for _ in $(seq 1 600); do
     if curl -fsS "$url" >/dev/null 2>&1; then
       return
     fi
@@ -208,7 +208,7 @@ wait_for_json_health() {
   local name="$1"
   local url="$2"
   local mode="$3"
-  for _ in $(seq 1 120); do
+  for _ in $(seq 1 600); do
     if python3 - "$url" "$mode" <<'PY'
 import json
 import sys
@@ -315,7 +315,7 @@ else
       --gpu-memory-utilization "${GENERAL_LLM_GPU_MEMORY_UTILIZATION:-0.90}" \
       --max-model-len "${GENERAL_LLM_MAX_MODEL_LEN:-8192}"
 fi
-wait_for_json_health "general-llm" "http://127.0.0.1:${GENERAL_LLM_PORT}/health" "http_ok"
+wait_for_http "http://127.0.0.1:${GENERAL_LLM_PORT}/v1/models"
 
 if [[ -f "$RUN_DIR/medical-llm.pid" ]] && kill -0 "$(cat "$RUN_DIR/medical-llm.pid")" 2>/dev/null; then
   :
@@ -400,9 +400,15 @@ else
       PUBMED_API_KEY="${PUBMED_API_KEY:-}" \
       SARVAM_API_KEY="${SARVAM_API_KEY:-}" \
       SEARXNG_URL="${SEARXNG_URL:-}" \
+      ENABLE_OPENRAG="${ENABLE_OPENRAG:-false}" \
+      OPENRAG_URL="${OPENRAG_URL:-http://127.0.0.1:8006}" \
+      ENABLE_CONTEXT_GRAPH="${ENABLE_CONTEXT_GRAPH:-false}" \
+      CONTEXT_GRAPH_URL="${CONTEXT_GRAPH_URL:-http://127.0.0.1:8007}" \
+      ENABLE_CONTEXT1_AGENT="${ENABLE_CONTEXT1_AGENT:-false}" \
+      CONTEXT1_URL="${CONTEXT1_URL:-http://127.0.0.1:8008}" \
       "$ROOT/platform/.venv/bin/python" main.py
 fi
-wait_for_json_health "platform" "http://127.0.0.1:${PLATFORM_PORT}/api/v1/health" "platform_healthy"
+wait_for_http "http://127.0.0.1:${PLATFORM_PORT}/api/v1/health/ready"
 
 echo "MedAI stack is running."
 echo "Public endpoint: http://127.0.0.1:${PUBLIC_PORT}"

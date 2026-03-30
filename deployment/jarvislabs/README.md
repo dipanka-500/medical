@@ -26,7 +26,9 @@ The Jarvis profile defaults the vLLM text stack to `float16`, which is the safer
 ## What changed in code
 
 - `medical_llm` now supports LRU-style model residency, optional auto-unload after each call, and sequential execution for heavy models.
+- `medical_llm` now exposes operator endpoints for `GET /models`, `POST /models/{model_key}/load`, `POST /models/{model_key}/unload`, and `POST /models/unload-all`.
 - `mediscan_v70` now supports the same pattern for its heavier vision models.
+- `platform` now enriches routed chat with optional OpenRAG, context-graph, and Context1 sidecars when the relevant feature flags and request options are enabled.
 - `medical_llm/config/model_config.jarvislabs_a6000x8.yaml` enables vLLM for the text-model stack with 4-way tensor parallelism for 70B models.
 
 ## First-time setup
@@ -49,6 +51,12 @@ The example uses `ENVIRONMENT=staging` on purpose so the platform runs without u
 
 ```bash
 bash deployment/jarvislabs/bootstrap_envs.sh
+```
+
+If you want the optional full-stack sidecars too, install those virtualenvs in the same step:
+
+```bash
+JARVIS_INSTALL_OPTIONAL_STACK=true bash deployment/jarvislabs/bootstrap_envs.sh
 ```
 
 If `python3.12` is not present in the template, the bootstrap script now falls back automatically to `python3.11`, `python3.10`, or `python3`.
@@ -79,9 +87,33 @@ bash deployment/jarvislabs/stop_stack.sh
 
 - The launcher uses local PostgreSQL and Redis, because JarvisLabs templates do not allow nested Docker.
 - The platform is configured to use `faiss` locally, so Qdrant is not required for this JarvisLabs path.
+- `ENABLE_OPENRAG` and `ENABLE_CONTEXT_GRAPH` are `false` by default in the Jarvis env example because the provided launcher does not boot OpenRAG, Qdrant/OpenSearch, or Neo4j for you. Turn them on only when those services are reachable at `OPENRAG_URL` / `CONTEXT_GRAPH_URL`.
 - `medical_llm` still needs its spaCy / SciSpaCy model assets if you want the NER layer fully active.
 - The OCR bootstrap now installs `transformers`, `accelerate`, and `safetensors` so the local FireRed backend is actually runnable after environment setup.
 - OCR now skips backends that are registered but not actually runnable in the current environment, and its health endpoint reports real backend availability instead of just registration.
 - Remote OCR preference defaults to off unless `SARVAM_API_KEY` is present; set `MEDISCAN_PREFER_REMOTE_API=true` if you want Sarvam prioritized.
-- The launcher now waits for true readiness, not just open ports: `medical_llm` must report `/ready`, `mediscan` must report healthy status, OCR must expose at least one ready backend, and the platform must reach overall `healthy`.
+- The launcher now waits for true readiness, not just open ports: `general_llm` must answer `/v1/models`, `medical_llm` must report `/ready`, `mediscan` must report healthy status, OCR must expose at least one ready backend, and the platform must reach `/api/v1/health/ready`.
 - If you expose extra JarvisLabs ports, you can move the platform back to `8000`, but `6006` is the default public endpoint in the provided docs.
+
+## System Validation
+
+Run the readiness harness after the stack is up:
+
+```bash
+python scripts/system_readiness.py --mode full --env-file deployment/jarvislabs/jarvislabs.env
+```
+
+Useful variants:
+
+```bash
+python scripts/system_readiness.py --mode static --env-file deployment/jarvislabs/jarvislabs.env
+python scripts/system_readiness.py --mode health --env-file deployment/jarvislabs/jarvislabs.env
+python scripts/system_readiness.py --mode live --env-file deployment/jarvislabs/jarvislabs.env --auth-password 'MedAIReadiness!234'
+```
+
+What it does:
+
+- Runs repository and environment checks for the 8-GPU profile.
+- Executes the existing `platform`, `medical_llm`, OCR, and evaluation test suites in parallel.
+- Performs parallel live health checks across platform, general LLM, medical LLM, MediScan, OCR, OpenRAG, and context graph.
+- Performs sequential deep probes for auth, routed chat, general LLM, medical LLM model lifecycle, OCR, OpenRAG, context graph, and MediScan model lifecycle.

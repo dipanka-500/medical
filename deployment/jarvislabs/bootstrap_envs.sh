@@ -36,6 +36,16 @@ require_uv() {
   fi
 }
 
+env_flag() {
+  local name="$1"
+  local default="${2:-false}"
+  local raw="${!name:-$default}"
+  case "${raw,,}" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 ensure_venv() {
   local dir="$1"
   if [[ ! -x "$dir/.venv/bin/python" ]]; then
@@ -96,11 +106,53 @@ install_ocr() {
   )
 }
 
+install_openrag() {
+  local dir="$ROOT/openrag_service"
+  ensure_venv "$dir"
+  (
+    cd "$dir"
+    source .venv/bin/activate
+    uv pip install -e .
+  )
+}
+
+install_context_graph() {
+  local dir="$ROOT/context_graph_service"
+  ensure_venv "$dir"
+  (
+    cd "$dir"
+    source .venv/bin/activate
+    uv pip install -e .
+  )
+}
+
+install_context1() {
+  local dir="$ROOT/context1_agent"
+  ensure_venv "$dir"
+  (
+    cd "$dir"
+    source .venv/bin/activate
+    uv pip install -e .
+  )
+}
+
 require_uv
 install_platform
 install_medical_llm
 install_general_llm_vllm
 install_mediscan
 install_ocr
+
+if env_flag JARVIS_INSTALL_OPTIONAL_STACK false || env_flag JARVIS_INSTALL_OPENRAG false; then
+  install_openrag
+fi
+
+if env_flag JARVIS_INSTALL_OPTIONAL_STACK false || env_flag JARVIS_INSTALL_CONTEXT_GRAPH false; then
+  install_context_graph
+fi
+
+if env_flag JARVIS_INSTALL_OPTIONAL_STACK false || env_flag JARVIS_INSTALL_CONTEXT1 false; then
+  install_context1
+fi
 
 echo "JarvisLabs Python environments are ready."

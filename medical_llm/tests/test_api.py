@@ -14,6 +14,7 @@ import app as app_module
 
 def _build_test_app(monkeypatch, settings: app_module.APISettings):
     calls: dict[str, object] = {}
+    model_state = {"deepseek_r1": {"is_loaded": False}}
 
     def fake_initialize(self, models_to_load=None):
         self._is_initialized = True
@@ -63,7 +64,24 @@ def _build_test_app(monkeypatch, settings: app_module.APISettings):
     monkeypatch.setattr(
         app_module.MedicalLLMEngine,
         "get_model_status",
-        lambda self: {"deepseek_r1": {"is_loaded": False}},
+        lambda self: dict(model_state),
+    )
+    monkeypatch.setattr(
+        app_module.MedicalLLMEngine,
+        "load_model",
+        lambda self, model_key: model_state.__setitem__(model_key, {"is_loaded": True}) is None,
+    )
+    monkeypatch.setattr(
+        app_module.MedicalLLMEngine,
+        "unload_model",
+        lambda self, model_key: model_state.__setitem__(model_key, {"is_loaded": False}),
+    )
+    monkeypatch.setattr(
+        app_module.MedicalLLMEngine,
+        "unload_all",
+        lambda self: model_state.update(
+            {key: {"is_loaded": False} for key in list(model_state)}
+        ),
     )
     monkeypatch.setattr(
         app_module.MedicalLLMEngine,
@@ -177,6 +195,26 @@ class TestApi:
         payload = response.json()
         assert payload["state_backend"]["mode"] == "memory"
         assert payload["request_limiter"]["distributed_enabled"] is False
+
+    def test_model_operator_endpoints(self, monkeypatch):
+        settings = app_module.APISettings(api_key="secret", init_on_startup=False)
+        test_app, calls = _build_test_app(monkeypatch, settings)
+
+        with TestClient(test_app) as client:
+            listed = client.get("/models", headers={"X-API-Key": "secret"})
+            loaded = client.post("/models/deepseek_r1/load", headers={"X-API-Key": "secret"})
+            unloaded = client.post("/models/deepseek_r1/unload", headers={"X-API-Key": "secret"})
+            unloaded_all = client.post("/models/unload-all", headers={"X-API-Key": "secret"})
+
+        assert calls["initialized"] == 1
+        assert listed.status_code == 200
+        assert listed.json()["models"]["deepseek_r1"]["is_loaded"] is False
+        assert loaded.status_code == 200
+        assert loaded.json()["models"]["deepseek_r1"]["is_loaded"] is True
+        assert unloaded.status_code == 200
+        assert unloaded.json()["models"]["deepseek_r1"]["is_loaded"] is False
+        assert unloaded_all.status_code == 200
+        assert unloaded_all.json()["models"]["deepseek_r1"]["is_loaded"] is False
 
     def test_analyze_sheds_load_when_queue_is_full(self, monkeypatch):
         settings = app_module.APISettings(api_key="secret", init_on_startup=False)

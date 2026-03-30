@@ -509,9 +509,37 @@ class MasterRouter:
         )
 
         # Honor explicit feature toggles from the frontend
-        if web_search and RouteTarget.SEARCH_RAG not in decision.secondary_targets:
+        if (
+            (web_search or decision.requires_search)
+            and decision.primary_target != RouteTarget.SEARCH_RAG
+            and RouteTarget.SEARCH_RAG not in decision.secondary_targets
+        ):
             decision.secondary_targets.append(RouteTarget.SEARCH_RAG)
             decision.requires_search = True
+
+        if (
+            (web_search or decision.requires_search)
+            and settings.enable_openrag
+            and decision.primary_target != RouteTarget.OPENRAG
+            and RouteTarget.OPENRAG not in decision.secondary_targets
+        ):
+            decision.secondary_targets.append(RouteTarget.OPENRAG)
+
+        if (
+            patient_id
+            and settings.enable_context_graph
+            and decision.primary_target != RouteTarget.CONTEXT_GRAPH
+            and RouteTarget.CONTEXT_GRAPH not in decision.secondary_targets
+        ):
+            decision.secondary_targets.append(RouteTarget.CONTEXT_GRAPH)
+
+        if (
+            deep_reasoning
+            and settings.enable_context1_agent
+            and decision.primary_target != RouteTarget.CONTEXT1_AGENT
+            and RouteTarget.CONTEXT1_AGENT not in decision.secondary_targets
+        ):
+            decision.secondary_targets.append(RouteTarget.CONTEXT1_AGENT)
 
         logger.info(
             "Routing decision: target=%s reason=%s request_id=%s",
@@ -898,7 +926,27 @@ class MasterRouter:
             timeout=60,
         )
         resp.raise_for_status()
-        return _sanitize_engine_output(resp.json())
+        payload = _sanitize_engine_output(resp.json())
+        if isinstance(payload, dict):
+            results = payload.get("results", [])
+            if isinstance(results, list) and "sources" not in payload:
+                payload["sources"] = [
+                    {
+                        "title": (
+                            item.get("metadata", {}).get("title")
+                            or item.get("metadata", {}).get("filename")
+                            or item.get("source")
+                            or "OpenRAG result"
+                        ),
+                        "content": item.get("text", ""),
+                        "score": item.get("rerank_score", item.get("score", item.get("relevance", 0.0))),
+                        "source": item.get("metadata", {}).get("source", "openrag"),
+                        "url": item.get("metadata", {}).get("url", ""),
+                    }
+                    for item in results
+                    if isinstance(item, dict)
+                ]
+        return payload
 
     async def _call_context_graph(
         self,
@@ -1043,7 +1091,18 @@ class MasterRouter:
         search_sources = search_resp.data.get("sources", []) if (
             search_resp and isinstance(search_resp.data, dict)
         ) else []
-        combined_sources = self._merge_sources(primary_sources, search_sources)
+        openrag_resp = next(
+            (r for r in secondaries
+             if r.engine == RouteTarget.OPENRAG.value and r.success),
+            None,
+        )
+        openrag_sources = openrag_resp.data.get("sources", []) if (
+            openrag_resp and isinstance(openrag_resp.data, dict)
+        ) else []
+        combined_sources = self._merge_sources(
+            primary_sources,
+            search_sources + openrag_sources,
+        )
         if combined_sources:
             result["sources"] = combined_sources
             result["answer"] = self._append_citation_block(

@@ -276,8 +276,11 @@ else
       ENABLE_SEARCH_RAG="false" \
       ENABLE_GRANITE_VISION="false" \
       ENABLE_OPENRAG="false" \
+      OPENRAG_URL="${OPENRAG_URL:-http://127.0.0.1:8006}" \
       ENABLE_CONTEXT_GRAPH="false" \
+      CONTEXT_GRAPH_URL="${CONTEXT_GRAPH_URL:-http://127.0.0.1:8007}" \
       ENABLE_CONTEXT1_AGENT="false" \
+      CONTEXT1_URL="${CONTEXT1_URL:-http://127.0.0.1:8008}" \
       VOICE_ASR_PROVIDER="disabled" \
       VOICE_TTS_PROVIDER="disabled" \
       "$ROOT/platform/.venv/bin/python" main.py

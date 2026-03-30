@@ -1485,6 +1485,48 @@ class MedicalLLMEngine:
             for key, engine in self._models.items()
         }
 
+    def load_model(self, model_key: str) -> bool:
+        """Explicitly load a specific model into memory."""
+        if model_key not in self._models:
+            return False
+
+        engine = self._models[model_key]
+
+        try:
+            with self._model_state_lock:
+                if self._max_resident_models > 0 and not engine.is_loaded:
+                    loaded_models = [
+                        key for key in self._resident_models
+                        if self._models.get(key) is not None and self._models[key].is_loaded
+                    ]
+                    while len(loaded_models) >= self._max_resident_models:
+                        evicted_key = next(
+                            (
+                                key for key in loaded_models
+                                if key != model_key and self._active_model_calls.get(key, 0) == 0
+                            ),
+                            None,
+                        )
+                        if evicted_key is None:
+                            break
+                        logger.info("Evicting resident model before explicit load: %s", evicted_key)
+                        self._models[evicted_key].unload()
+                        self._resident_models.pop(evicted_key, None)
+                        loaded_models = [
+                            key for key in self._resident_models
+                            if self._models.get(key) is not None and self._models[key].is_loaded
+                        ]
+
+                if not engine.is_loaded:
+                    logger.info("Explicitly loading model: %s", model_key)
+                    engine.load()
+
+                self._touch_resident_model(model_key)
+            return True
+        except Exception:
+            logger.exception("Failed to load model: %s", model_key)
+            return False
+
     def unload_model(self, model_key: str) -> None:
         """Unload a specific model from memory."""
         if model_key in self._models:
