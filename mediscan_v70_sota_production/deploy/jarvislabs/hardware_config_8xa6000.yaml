@@ -1,0 +1,127 @@
+# ============================================================
+# MediScan AI v7.0 — Hardware Config: JarvisLabs 8x A6000
+# ============================================================
+# Instance: 8 × NVIDIA A6000 (Ampere) | 48 GB VRAM each
+# Total VRAM: 384 GB | RAM: 256 GB | CPUs: 56
+#
+# GPU ASSIGNMENT STRATEGY
+# ─────────────────────────────────────────────────────────────
+# GPU 0,1  (96 GB) → hulu_med_32b          (64 GB bfloat16)
+# GPU 2,3  (96 GB) → medgemma_27b  (54 GB) + medix_r1_30b (36 GB MoE)
+#                    GPU2=43 GB medgemma | GPU3=11 GB medgemma + 36 GB medix_r1_30b
+# GPU 4    (48 GB) → hulu_med_14b (28 GB) + medgemma_4b (8 GB) + chexagent_3b (6 GB) = 42 GB
+# GPU 5    (48 GB) → medix_r1_8b (16 GB)  + hulu_med_7b (14 GB) + med3dvlm (14 GB)   = 44 GB
+# GPU 6    (48 GB) → chexagent_8b (16 GB) + medix_r1_2b (4 GB)  + radfm (7 GB)       = 27 GB
+# GPU 7    (48 GB) → pathgen (3 GB) + retfound (0.5 GB) + merlin (2 GB)
+#                    + biomedclip (1 GB) ← much headroom for KV cache
+# ─────────────────────────────────────────────────────────────
+
+gpu:
+  auto_detect: true
+  device_map_strategy: "auto"
+  max_memory_fraction: 0.90
+  memory_efficient: true
+  flash_attention: true          # A6000 is Ampere → flash-attn 2 supported
+
+compute:
+  default_dtype: "bfloat16"     # A6000 has native bfloat16 support
+  torch_compile: false
+  inference_mode: true
+  gradient_checkpointing: false
+
+memory:
+  max_cpu_memory_gb: 200         # 256 GB RAM on instance — leave 56 GB free
+  cpu_offload: true
+  disk_offload: false
+  disk_offload_dir: "/home/offload"
+
+parallel:
+  max_concurrent_models: 8      # One full pipeline per GPU pair
+  thread_pool_size: 16
+  process_pool_size: 8
+
+lazy_loading:
+  # All models pre-loaded at startup via sequential_loader.py
+  max_resident_models: 0         # 0 = keep all resident (no eviction)
+  auto_unload_after_inference: false
+  sequential_heavy_models: true  # Serialise loading of >20B models
+
+server:
+  host: "0.0.0.0"
+  port: 8080                     # Custom HTTP port added in JarvisLabs Advanced Settings
+  workers: 1                     # Single process — models live in-process
+  reload: false
+  log_level: "info"
+  cors_origins: ["*"]
+  max_upload_size_mb: 500
+
+# ── Per-model GPU memory caps (passed as max_memory to from_pretrained) ──────
+# Keys are GPU indices (int) or "cpu".
+# Values are strings accepted by HuggingFace: "43GB", "200GB", etc.
+gpu_memory_map:
+  hulu_med_32b:
+    0: "43GB"
+    1: "43GB"
+    cpu: "20GB"
+
+  hulu_med_14b:
+    4: "30GB"
+    cpu: "10GB"
+
+  hulu_med_7b:
+    5: "16GB"
+    cpu: "8GB"
+
+  medgemma_27b:
+    2: "43GB"
+    3: "13GB"
+    cpu: "10GB"
+
+  medgemma_4b:
+    4: "10GB"
+    cpu: "5GB"
+
+  medix_r1_30b:
+    3: "34GB"          # GPU3 has 13 GB used by medgemma_27b → 35 GB free
+    4: "6GB"
+    cpu: "10GB"
+
+  medix_r1_8b:
+    5: "18GB"
+    cpu: "5GB"
+
+  medix_r1_2b:
+    6: "6GB"
+    cpu: "3GB"
+
+  med3dvlm:
+    5: "16GB"
+    cpu: "5GB"
+
+  merlin:
+    7: "4GB"
+    cpu: "3GB"
+
+  chexagent_8b:
+    6: "18GB"
+    cpu: "5GB"
+
+  chexagent_3b:
+    4: "8GB"
+    cpu: "3GB"
+
+  pathgen:
+    7: "5GB"
+    cpu: "2GB"
+
+  retfound:
+    7: "2GB"
+    cpu: "1GB"
+
+  radfm:
+    6: "9GB"
+    cpu: "4GB"
+
+  biomedclip:
+    7: "2GB"
+    cpu: "1GB"

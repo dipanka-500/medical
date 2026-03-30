@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════════════════════
+#  Medical Text-to-Text Super-LLM Engine — Dependencies
+#  Requires Python >= 3.9 (uses PEP 585 via __future__)
+# ═══════════════════════════════════════════════════════
+
+# Core ML Frameworks
+torch>=2.1.0
+transformers>=4.40.0
+accelerate>=0.27.0
+safetensors>=0.4.0
+sentencepiece>=0.2.0
+protobuf>=4.25.0
+tokenizers>=0.15.0
+
+# Optional high-throughput backend:
+#   pip install ".[vllm]"
+
+# Embeddings & Vector Store
+faiss-cpu>=1.7.4
+sentence-transformers>=2.3.0
+
+# NLP & NER
+scispacy>=0.5.3
+spacy>=3.7.0
+# After install run: pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
+# And: pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_ner_bc5cdr_md-0.5.3.tar.gz
+
+# RAG & Search
+duckduckgo-search>=5.0.0
+requests>=2.31.0
+xmltodict>=0.13.0
+trafilatura>=1.9.0
+pypdf>=4.2.0
+qdrant-client>=1.11.0
+langgraph>=0.2.34
+
+# Data Processing
+numpy>=1.24.0
+pandas>=2.0.0
+pyyaml>=6.0.1
+tqdm>=4.65.0
+
+# API Server
+fastapi>=0.110.0
+uvicorn>=0.27.0
+pydantic>=2.5.0
+redis[hiredis]>=5.0.0
+
+# Logging & Monitoring
+rich>=13.7.0
+prometheus-client>=0.20.0
+
+# Test tooling is intentionally excluded from the production image.

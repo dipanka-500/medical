@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medai-context-graph"
+version = "0.1.0"
+description = "Neo4j-backed longitudinal patient memory with POLE+O knowledge graph and decision traces."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.100,<1.0",
+    "uvicorn>=0.20",
+    "httpx>=0.24,<1.0",
+    "pydantic>=2.0,<3.0",
+    "neo4j>=5.0,<6.0",
+    "sentence-transformers>=2.2",
+    "numpy>=1.22",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]

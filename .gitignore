@@ -1,0 +1,72 @@
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.whl
+
+# ── Virtual environments ─────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Environment variables (NEVER commit secrets) ─────────────────
+.env
+.env.local
+.env.production
+.env.staging
+
+# ── IDE ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Node / Frontend ──────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.cache/
+*.tsbuildinfo
+
+# ── Test / Coverage ──────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ── Docker ───────────────────────────────────────────────────────
+*.log
+
+# ── Data & Models (too large for git) ────────────────────────────
+*.pth
+*.pt
+*.bin
+*.onnx
+*.safetensors
+*.incomplete
+data/
+logs/
+outputs/
+models/
+*.faiss
+
+# ── Uploads / Temp ───────────────────────────────────────────────
+/tmp/
+uploads/
+
+# ── SSL Certificates ─────────────────────────────────────────────
+*.pem
+*.key
+*.crt
+*.csr

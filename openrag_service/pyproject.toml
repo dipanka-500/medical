@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medai-openrag-service"
+version = "0.1.0"
+description = "OpenRAG-style agentic RAG ingestion with Docling, re-ranking, and multi-agent coordination for MedAI."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.100,<1.0",
+    "uvicorn>=0.20",
+    "httpx>=0.24,<1.0",
+    "pydantic>=2.0,<3.0",
+    "python-multipart>=0.0.5",
+    "docling>=2.0",
+    "qdrant-client>=1.7",
+    "sentence-transformers>=2.2",
+    "numpy>=1.22",
+    "opensearch-py>=2.4",
+    "tiktoken>=0.5",
+]
+
+[project.optional-dependencies]
+reranker = [
+    "flashrank>=0.2",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]

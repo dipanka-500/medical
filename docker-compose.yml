@@ -1,0 +1,758 @@
+# ═══════════════════════════════════════════════════════════════════
+#  MEDISCAN AI — PRODUCTION DOCKER COMPOSE
+#  Enterprise-grade orchestration with security, monitoring, isolation
+#
+#  Pre-download models before first run:
+#    pip install huggingface_hub
+#    python scripts/download_models.py --tier core
+# ═══════════════════════════════════════════════════════════════════
+
+services:
+  # ── Platform API Gateway ─────────────────────────────────────────
+  platform:
+    build:
+      context: ./platform
+      dockerfile: Dockerfile
+      args:
+        BUILD_DATE: "${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+        VCS_REF: "${VCS_REF:-dev}"
+        INSTALL_VOICE_EXTRAS: "${PLATFORM_INSTALL_VOICE:-false}"
+    ports:
+      - "${PLATFORM_PORT:-8000}:8000"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-medai}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}@postgres:5432/${POSTGRES_DB:-medai}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required}@redis:6379/0
+      - VOICE_MODEL_CACHE_DIR=/models
+      - VOICE_ASR_PROVIDER=${VOICE_ASR_PROVIDER:-disabled}
+      - VOICE_ASR_MODEL=${VOICE_ASR_MODEL:-large-v3}
+      - VOICE_ASR_DEVICE=${VOICE_ASR_DEVICE:-auto}
+      - VOICE_ASR_COMPUTE_TYPE=${VOICE_ASR_COMPUTE_TYPE:-int8}
+      - VOICE_TTS_PROVIDER=${VOICE_TTS_PROVIDER:-disabled}
+      - VOICE_TTS_MODEL=${VOICE_TTS_MODEL:-tts_models/multilingual/multi-dataset/xtts_v2}
+      - VOICE_TTS_DEVICE=${VOICE_TTS_DEVICE:-auto}
+      - VOICE_TTS_LANGUAGE=${VOICE_TTS_LANGUAGE:-en}
+      - MEDISCAN_VLM_URL=http://mediscan-vlm:8001
+      - MEDICAL_LLM_URL=http://medical-llm:8002
+      - MEDISCAN_OCR_URL=http://mediscan-ocr:8003
+      - GRANITE_VLLM_URL=http://granite-vision:8005/v1
+      - OPENRAG_URL=http://openrag-service:8006
+      - CONTEXT_GRAPH_URL=http://context-graph:8007
+      - CONTEXT1_URL=http://context1-agent:8008
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY required}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY required}
+      - CSRF_TOKEN_SECRET=${CSRF_TOKEN_SECRET:?CSRF_TOKEN_SECRET required}
+      - CORS_ALLOW_HEADERS=${CORS_ALLOW_HEADERS:-Content-Type,Authorization,X-CSRF-Token}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      # General LLM — points to the local general-llm service
+      - LLM_PROVIDER=openai_compatible
+      - LLM_API_KEY=local-no-key-needed
+      - LLM_MODEL=${GENERAL_LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
+      - LLM_BASE_URL=http://general-llm:8004
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - PUBMED_API_KEY=${PUBMED_API_KEY:-}
+      - SEARXNG_URL=${SEARXNG_URL:-}
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-qdrant}
+      - VECTOR_DB_URL=${VECTOR_DB_URL:-http://qdrant:6333}
+      - SARVAM_API_KEY=${SARVAM_API_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      # Workers=1 when using embedding router (model loaded per-worker)
+      - UVICORN_WORKERS=1
+      # Embedding router uses pre-downloaded BGE model
+      - HF_HOME=/models
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      general-llm:
+        condition: service_healthy
+    networks:
+      - backend-net
+      - data-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G       # Increased: BGE embedding model (~1.3GB) for intent routing
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service"
+
+  # ── General LLM (conversational backbone — local open-source) ──────
+  # Serves Qwen2.5-7B-Instruct with OpenAI-compatible API.
+  # All text queries route here. No external API calls — fully local.
+  general-llm:
+    build:
+      context: ./general_llm
+    ports:
+      - "${GENERAL_LLM_PORT:-8004}:8004"
+    environment:
+      - PORT=8004
+      - MODEL_ID=${GENERAL_LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
+      - MAX_NEW_TOKENS=${LLM_MAX_TOKENS:-4096}
+      - TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - MAX_CONCURRENT=${GENERAL_LLM_MAX_CONCURRENT:-2}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - CUDA_VISIBLE_DEVICES=${GENERAL_LLM_CUDA_DEVICES:-}
+      # Use pre-downloaded models — no HuggingFace calls at runtime
+      - HF_HOME=/models
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    networks:
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 20G
+        reservations:
+          cpus: "1.0"
+          memory: 8G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 300s    # Model loading takes time
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ── MediScan VLM Engine (GPU optional; prod override enables NVIDIA) ─────
+  mediscan-vlm:
+    build:
+      context: ./mediscan_v70_sota_production/mediscan_v70
+      args:
+        BUILD_DATE: "${BUILD_DATE:-}"
+    ports:
+      - "${VLM_PORT:-8001}:8001"
+    environment:
+      - PORT=8001
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - CUDA_VISIBLE_DEVICES=${VLM_CUDA_DEVICES:-}
+      - OMP_NUM_THREADS=${VLM_OMP_THREADS:-4}
+      # Use pre-downloaded models
+      - HF_HOME=/models
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    networks:
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 16G
+        reservations:
+          cpus: "1.0"
+          memory: 4G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ── Medical LLM Engine (GPU optional; prod override enables NVIDIA) ──────
+  medical-llm:
+    build:
+      context: ./medical_llm
+      args:
+        BUILD_DATE: "${BUILD_DATE:-}"
+        ENABLE_VLLM: "${MEDICAL_LLM_ENABLE_VLLM:-false}"
+    ports:
+      - "${LLM_PORT:-8002}:8002"
+    environment:
+      - PORT=8002
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - CUDA_VISIBLE_DEVICES=${LLM_CUDA_DEVICES:-}
+      - OMP_NUM_THREADS=${LLM_OMP_THREADS:-4}
+      - MEDICAL_LLM_API_KEY=${MEDICAL_LLM_API_KEY:-}
+      - MEDICAL_LLM_MAX_CONCURRENT_REQUESTS=${MEDICAL_LLM_MAX_CONCURRENT:-2}
+      - MEDICAL_LLM_QUEUE_TIMEOUT_SECONDS=${MEDICAL_LLM_QUEUE_TIMEOUT_SECONDS:-30}
+      - MEDICAL_LLM_MAX_QUEUE_DEPTH=${MEDICAL_LLM_MAX_QUEUE_DEPTH:-4}
+      - MEDICAL_LLM_REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required}@redis:6379/0
+      - MEDICAL_LLM_SHARED_STATE_ENABLED=${MEDICAL_LLM_SHARED_STATE_ENABLED:-true}
+      - MEDICAL_LLM_DISTRIBUTED_MAX_CONCURRENT_REQUESTS=${MEDICAL_LLM_DISTRIBUTED_MAX_CONCURRENT_REQUESTS:-2}
+      - MEDICAL_LLM_CACHE_TTL_SECONDS=${MEDICAL_LLM_CACHE_TTL_SECONDS:-300}
+      - MEDICAL_LLM_SESSION_TTL_SECONDS=${MEDICAL_LLM_SESSION_TTL_SECONDS:-3600}
+      - MEDICAL_LLM_VECTOR_STORE=${MEDICAL_LLM_VECTOR_STORE:-qdrant}
+      - MEDICAL_LLM_QDRANT_URL=${MEDICAL_LLM_QDRANT_URL:-http://qdrant:6333}
+      - MEDICAL_LLM_PUBMED_API_KEY=${PUBMED_API_KEY:-}
+      - MEDICAL_LLM_SEARXNG_URL=${SEARXNG_URL:-}
+      # Use pre-downloaded models
+      - HF_HOME=/models
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    networks:
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 16G
+        reservations:
+          cpus: "1.0"
+          memory: 4G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ── MediScan OCR Engine ──────────────────────────────────────────
+  mediscan-ocr:
+    build:
+      context: "./documnet ocr"
+      args:
+        BUILD_DATE: "${BUILD_DATE:-}"
+        ENABLE_GPU: "${OCR_ENABLE_GPU:-false}"
+        ENABLE_SARVAM: "${OCR_ENABLE_SARVAM:-false}"
+    ports:
+      - "${OCR_PORT:-8003}:8003"
+    environment:
+      - PORT=8003
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - SARVAM_API_KEY=${SARVAM_API_KEY:-}
+      # Use pre-downloaded models
+      - HF_HOME=/models
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    networks:
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ── Granite Vision 4.0 3B Sidecar (document extraction — GPU) ────
+  granite-vision:
+    build:
+      context: ./granite_vision_sidecar
+      args:
+        BUILD_DATE: "${BUILD_DATE:-}"
+    ports:
+      - "${GRANITE_PORT:-8005}:8005"
+    environment:
+      - HF_HOME=/models
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - CUDA_VISIBLE_DEVICES=${GRANITE_CUDA_DEVICES:-0}
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    networks:
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 12G
+        reservations:
+          cpus: "1.0"
+          memory: 4G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 300s
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ── OpenRAG Service (agentic RAG ingestion + hybrid search) ─────
+  openrag-service:
+    build:
+      context: ./openrag_service
+      args:
+        BUILD_DATE: "${BUILD_DATE:-}"
+    ports:
+      - "${OPENRAG_PORT:-8006}:8006"
+    environment:
+      - OPENRAG_PORT=8006
+      - OPENRAG_QDRANT_URL=http://qdrant:6333
+      - OPENRAG_OPENSEARCH_URL=http://opensearch:9200
+      - OPENRAG_OPENSEARCH_ENABLED=${OPENRAG_OPENSEARCH_ENABLED:-true}
+      - OPENRAG_LLM_URL=http://general-llm:8004
+      - OPENRAG_LLM_MODEL=${GENERAL_LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
+      - GRANITE_VLLM_URL=http://granite-vision:8005/v1
+      - GRANITE_ENABLED=${GRANITE_ENABLED:-true}
+      - HF_HOME=/models
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    depends_on:
+      qdrant:
+        condition: service_started
+      general-llm:
+        condition: service_healthy
+    networks:
+      - backend-net
+      - data-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── Neo4j 5 (context graph for patient longitudinal memory) ─────
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-changeme}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_memory_heap_initial__size: 512m
+      NEO4J_dbms_memory_heap_max__size: 1G
+      NEO4J_dbms_memory_pagecache_size: 256m
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"   # Browser
+      - "${NEO4J_BOLT_PORT:-7687}:7687"   # Bolt protocol
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - data-net
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ── Context Graph Service (Neo4j patient memory API) ────────────
+  context-graph:
+    build:
+      context: ./context_graph_service
+      args:
+        BUILD_DATE: "${BUILD_DATE:-}"
+    ports:
+      - "${CONTEXT_GRAPH_PORT:-8007}:8007"
+    environment:
+      - CONTEXT_GRAPH_PORT=8007
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-changeme}
+      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
+      - CONTEXT_GRAPH_PHI_AUDIT=true
+      - CONTEXT_GRAPH_ENCRYPT_PHI=${CONTEXT_GRAPH_ENCRYPT_PHI:-true}
+      - HF_HOME=/models
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - backend-net
+      - data-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ── Chroma Context-1 Agent (multi-hop retrieval — stub harness) ──
+  context1-agent:
+    build:
+      context: ./context1_agent
+      args:
+        BUILD_DATE: "${BUILD_DATE:-}"
+    ports:
+      - "${CONTEXT1_PORT:-8008}:8008"
+    environment:
+      - CONTEXT1_PORT=8008
+      - CONTEXT1_OPENRAG_URL=http://openrag-service:8006
+      - CONTEXT1_LLM_URL=http://general-llm:8004
+      - CONTEXT1_LLM_MODEL=${GENERAL_LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
+      - CONTEXT1_MAX_TURNS=${CONTEXT1_MAX_TURNS:-4}
+      - CONTEXT1_TOKEN_BUDGET=${CONTEXT1_TOKEN_BUDGET:-8000}
+    depends_on:
+      openrag-service:
+        condition: service_healthy
+      general-llm:
+        condition: service_healthy
+    networks:
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ── OpenSearch (full-text search for OpenRAG hybrid retrieval) ───
+  opensearch:
+    image: opensearchproject/opensearch:2.12.0
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - bootstrap.memory_lock=true
+    ports:
+      - "${OPENSEARCH_PORT:-9200}:9200"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - data-net
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsSL http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ── PostgreSQL 16 ────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      POSTGRES_DB: ${POSTGRES_DB:-medai}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backup:/backups
+      - ./platform/db/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    ports:
+      # SECURITY: Do NOT expose DB port in production. Use only for local dev.
+      - "${POSTGRES_PORT:-127.0.0.1:5432}:5432"
+    networks:
+      - data-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medai} -d ${POSTGRES_DB:-medai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "log_min_duration_statement=500"
+      - "-c"
+      - "log_checkpoints=on"
+      - "-c"
+      - "log_connections=on"
+      - "-c"
+      - "log_disconnections=on"
+      - "-c"
+      - "log_lock_waits=on"
+      # SSL: Uncomment after mounting certs via volumes
+      # - "-c"
+      # - "ssl=on"
+      # - "-c"
+      # - "ssl_cert_file=/var/lib/postgresql/server.crt"
+      # - "-c"
+      # - "ssl_key_file=/var/lib/postgresql/server.key"
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ── Valkey 7.2 (Redis-compatible cache / rate limiting) ────────
+  redis:
+    image: valkey/valkey:7.2-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - data-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "sh", "-c", "valkey-cli -a \"${REDIS_PASSWORD:?REDIS_PASSWORD required}\" ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    command: >
+      valkey-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --tcp-backlog 511
+      --timeout 300
+      --tcp-keepalive 60
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      --protected-mode yes
+      --loglevel notice
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Qdrant (vector database for medical search/RAG) ───────────────
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - backend-net
+      - data-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1G
+        reservations:
+          cpus: "0.2"
+          memory: 128M
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ── Frontend (React + Nginx) ─────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      platform:
+        condition: service_healthy
+    networks:
+      - frontend-net
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ── Networks (strict isolation) ──────────────────────────────────
+networks:
+  frontend-net:
+    driver: bridge
+    name: medai-frontend
+  backend-net:
+    driver: bridge
+    name: medai-backend
+  data-net:
+    driver: bridge
+    name: medai-data
+    internal: true  # data-net has no external access
+
+# ── Volumes (persistent data) ───────────────────────────────────
+volumes:
+  postgres_data:
+    name: medai-postgres-data
+  postgres_backup:
+    name: medai-postgres-backup
+  redis_data:
+    name: medai-redis-data
+  qdrant_data:
+    name: medai-qdrant-data
+  neo4j_data:
+    name: medai-neo4j-data
+  neo4j_logs:
+    name: medai-neo4j-logs
+  opensearch_data:
+    name: medai-opensearch-data

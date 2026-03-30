@@ -1,0 +1,63 @@
+# ============================================================
+# MediScan AI v7.0 — Dependencies (18-Model Engine)
+# ============================================================
+
+# Core ML
+torch>=2.4.0
+torchvision>=0.19.0
+transformers>=4.50.0
+# NOTE: HuluMed officially pins transformers==4.51.2, accelerate==1.7.0,
+#       torch==2.4.0, flash-attn==2.7.3. If you encounter HuluMed
+#       compatibility issues, consider pinning to those exact versions.
+accelerate>=1.2.0
+safetensors>=0.4.0
+
+# Medical Models
+open-clip-torch>=2.26.0  # BiomedCLIP
+monai>=1.4.0             # Medical image preprocessing + 3D transforms
+timm>=1.0.0              # RETFound ViT backbone
+
+# Medical Imaging
+pydicom>=2.4.0           # DICOM loading
+nibabel>=5.2.0           # NIfTI loading
+SimpleITK>=2.3.0         # 3D medical images (Med3DVLM, Merlin, RadFM)
+Pillow>=10.0.0           # Image processing
+opencv-python>=4.9.0     # Video processing
+scikit-image>=0.22.0     # Image quality assessment
+
+# Qwen VL Utils (CheXagent-2, MediX-R1)
+qwen-vl-utils>=0.0.8
+
+# API Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.9
+pydantic>=2.0.0
+
+# RAG
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+duckduckgo-search>=6.0.0
+rank-bm25>=0.2.2          # BM25 sparse retrieval for hybrid RAG
+
+# FHIR
+fhir.resources>=7.0.0
+
+# Translation (Sarvam AI)
+httpx>=0.27.0
+
+# Monitoring & Logging
+structlog>=24.0.0
+prometheus-client>=0.21.0
+
+# Security
+cryptography>=43.0.0
+python-jose[cryptography]>=3.3.0
+
+# Utilities
+pyyaml>=6.0.0
+numpy>=1.26.0
+pandas>=2.2.0
+tqdm>=4.66.0
+rich>=13.7.0
+aiofiles>=24.1.0

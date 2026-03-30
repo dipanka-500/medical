@@ -1,0 +1,19 @@
+[project]
+name = "medai-general-llm"
+version = "1.0.0"
+description = "General-purpose LLM service for MedAI Platform (OpenAI-compatible API)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.9.0",
+    "torch>=2.2.0",
+    "transformers>=4.45.0",
+    "accelerate>=0.34.0",
+    "sentencepiece>=0.2.0",
+    "huggingface_hub>=0.25.0",
+]
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"

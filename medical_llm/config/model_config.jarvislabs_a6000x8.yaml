@@ -1,0 +1,133 @@
+# JarvisLabs A6000 x8 profile.
+# Uses vLLM for text-model loading and keeps heavy 70B models shardable across 4 GPUs.
+
+defaults:
+  device_map: "auto"
+  torch_dtype: "float16"
+  trust_remote_code: false
+  max_new_tokens: 4096
+  temperature: 0.3
+  top_p: 0.9
+  repetition_penalty: 1.15
+  do_sample: true
+  use_vllm: false
+  tensor_parallel_size: 1
+  max_model_len: 8192
+  gpu_memory_utilization: 0.90
+
+models:
+  deepseek_r1:
+    model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+    role: "reasoning"
+    description: "Primary reasoning engine with self-reflection (distilled)"
+    max_new_tokens: 8192
+    temperature: 0.6
+    weight: 0.95
+    self_reflection_passes: 3
+    constraint_prompting: true
+    use_vllm: true
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.92
+    memory_tier: "heavy"
+
+  meditron_70b:
+    model_id: "epfl-llm/meditron-70b"
+    role: "medical_reasoning"
+    description: "Clinical reasoning specialist"
+    max_new_tokens: 4096
+    temperature: 0.3
+    weight: 0.90
+    use_vllm: true
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.92
+    memory_tier: "heavy"
+
+  mellama_13b:
+    model_id: "clinicalnlplab/Me-LLaMA-13b"
+    role: "conversational"
+    description: "Conversational medical Q&A"
+    max_new_tokens: 2048
+    temperature: 0.5
+    weight: 0.75
+    memory_tier: "medium"
+
+  pmc_llama_13b:
+    model_id: "axiong/PMC_LLaMA_13B"
+    role: "literature"
+    description: "Medical literature comprehension"
+    max_new_tokens: 4096
+    temperature: 0.3
+    weight: 0.72
+    memory_tier: "medium"
+
+  openbiollm_70b:
+    model_id: "aaditya/Llama3-OpenBioLLM-70B"
+    role: "medical_reasoning"
+    description: "SOTA open-source medical LLM"
+    max_new_tokens: 4096
+    temperature: 0.3
+    weight: 0.92
+    use_vllm: true
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.92
+    memory_tier: "heavy"
+
+  biomistral_7b:
+    model_id: "BioMistral/BioMistral-7B"
+    role: "fast_engine"
+    description: "Fast inference for routing and simple Q&A"
+    max_new_tokens: 2048
+    temperature: 0.3
+    weight: 0.70
+    use_vllm: true
+    memory_tier: "light"
+
+  clinical_camel_70b:
+    model_id: "wanglab/ClinicalCamel-70B"
+    role: "validator"
+    description: "Clinical safety validator"
+    max_new_tokens: 2048
+    temperature: 0.2
+    weight: 0.85
+    use_vllm: true
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.92
+    memory_tier: "heavy"
+
+  med42_70b:
+    model_id: "m42-health/Llama3-Med42-70B"
+    role: "validator"
+    description: "Secondary diagnostic validator"
+    max_new_tokens: 2048
+    temperature: 0.2
+    weight: 0.88
+    use_vllm: true
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.92
+    memory_tier: "heavy"
+
+  chatdoctor:
+    model_id: "zl111/ChatDoctor"
+    role: "conversational"
+    description: "Patient-facing conversational assistant"
+    max_new_tokens: 1024
+    temperature: 0.6
+    weight: 0.65
+    memory_tier: "medium"
+
+embedding:
+  model_id: "BAAI/bge-large-en-v1.5"
+  device: "cuda"
+  batch_size: 64
+  normalize: true
+
+priority_order:
+  - deepseek_r1
+  - openbiollm_70b
+  - meditron_70b
+  - med42_70b
+  - clinical_camel_70b
+  - mellama_13b
+  - pmc_llama_13b
+  - biomistral_7b
+  - chatdoctor

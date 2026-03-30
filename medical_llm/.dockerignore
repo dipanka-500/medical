@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.env
+*.egg-info
+dist
+build
+data/rag/faiss_index/*
+data/rag/pubmed_cache/*
+logs/
+.pytest_cache
+.mypy_cache
+.ruff_cache

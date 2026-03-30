@@ -1,0 +1,164 @@
+# ============================================================
+# MediScan AI v7.0 — Pipeline Configuration (16-Model Engine)
+# ============================================================
+
+pipeline:
+  stages:
+    - name: "ingestion"
+      enabled: true
+      timeout_seconds: 30
+    - name: "preprocessing"
+      enabled: true
+      timeout_seconds: 60
+    - name: "routing"
+      enabled: true
+    - name: "model_execution"
+      enabled: true
+      timeout_seconds: 300
+      max_parallel_models: 5   # v7.0: increased for more models
+    - name: "fusion"
+      enabled: true
+    - name: "reasoning"
+      enabled: true
+      timeout_seconds: 120
+    - name: "governance"
+      enabled: true
+    - name: "reporting"
+      enabled: true
+    - name: "translation"
+      enabled: true
+      default_language: "en"
+
+routing:
+  confidence_threshold: 0.7
+  min_models_per_task: 2
+  max_models_per_task: 5  # v7.0: allow up to 5 models per task
+
+fusion:
+  strategy: "weighted_average"
+  min_agreement: 0.6
+  confidence_threshold: 0.75
+  contradiction_detection: true
+  # v7.0: Modality-aware specialist boosting
+  specialist_boost:
+    enabled: true
+    boost_factor: 0.15
+  anti_hallucination:
+    enabled: true
+    biomedclip_verification: true
+    rag_fact_check: true
+    web_search_verification: true
+
+governance:
+  clinical_validation:
+    enabled: true
+    icd10_validation: true
+    medical_terminology_check: true
+  guideline_checking:
+    enabled: true
+    sources: ["WHO", "NIH", "ACR", "AHA", "AAO", "CAP"]
+  risk_flagging:
+    enabled: true
+    critical_findings:
+      - "pneumothorax"
+      - "pulmonary_embolism"
+      - "stroke"
+      - "myocardial_infarction"
+      - "aortic_dissection"
+      - "tension_pneumothorax"
+      - "intracranial_hemorrhage"
+      - "spinal_cord_compression"
+      - "retinal_detachment"
+      - "acute_glaucoma"
+  explainability:
+    grad_cam: true
+    attention_maps: true
+  audit:
+    enabled: true
+    log_dir: "./logs/audit"
+
+rag:
+  enabled: true
+  vector_store: "chromadb"
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  collection_name: "medical_knowledge"
+  chunk_size: 512
+  chunk_overlap: 50
+  top_k: 5
+  data_sources:
+    - name: "pubmed_guidelines"
+      type: "local"
+      path: "./data/rag/pubmed"
+    - name: "who_guidelines"
+      type: "local"
+      path: "./data/rag/who"
+    - name: "radiology_guidelines"
+      type: "local"
+      path: "./data/rag/radiology"
+  web_search:
+    enabled: true
+    engine: "duckduckgo"
+    max_results: 5
+    medical_domains:
+      - "pubmed.ncbi.nlm.nih.gov"
+      - "radiopaedia.org"
+      - "who.int"
+      - "nih.gov"
+
+reporting:
+  format: "structured"
+  include_sections:
+    - "patient_info"
+    - "clinical_indication"
+    - "technique"
+    - "findings"
+    - "impressions"
+    - "recommendations"
+    - "confidence_scores"
+    - "model_attribution"
+    - "specialist_consensus"  # v7.0
+  fhir:
+    enabled: true
+    version: "R4"
+    resource_type: "DiagnosticReport"
+
+translation:
+  provider: "sarvam_ai"
+  api_base: "https://api.sarvam.ai/translate"
+  supported_languages:
+    - code: "hi"
+      name: "Hindi"
+    - code: "ta"
+      name: "Tamil"
+    - code: "kn"
+      name: "Kannada"
+    - code: "te"
+      name: "Telugu"
+    - code: "bn"
+      name: "Bengali"
+    - code: "mr"
+      name: "Marathi"
+    - code: "gu"
+      name: "Gujarati"
+    - code: "ml"
+      name: "Malayalam"
+    - code: "pa"
+      name: "Punjabi"
+    - code: "or"
+      name: "Odia"
+  default_target: "en"
+
+monitoring:
+  drift_detection:
+    enabled: true
+    window_size: 100
+    threshold: 0.1
+  ood_detection:
+    enabled: true
+    method: "mahalanobis"
+  metrics:
+    - "inference_time"
+    - "confidence_distribution"
+    - "model_agreement_rate"
+    - "critical_finding_rate"
+    - "specialist_usage_rate"   # v7.0

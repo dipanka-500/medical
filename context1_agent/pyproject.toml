@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medai-context1-agent"
+version = "0.1.0"
+description = "Chroma Context-1 multi-hop retrieval agent harness for MedAI (watch mode — harness not yet public)."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.100,<1.0",
+    "uvicorn>=0.20",
+    "httpx>=0.24,<1.0",
+    "pydantic>=2.0,<3.0",
+]
+
+[project.optional-dependencies]
+full = [
+    "chromadb>=0.4",
+    "transformers>=4.40",
+    "torch>=2.0",
+]
+dev = [
+    "pytest>=7.0",
+]

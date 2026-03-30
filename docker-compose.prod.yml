@@ -1,0 +1,211 @@
+# =====================================================================
+#  MEDISCAN AI — PRODUCTION OVERRIDE
+#  Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =====================================================================
+
+services:
+  # ── Platform API Gateway (production hardening) ───────────────────
+  platform:
+    environment:
+      - ENVIRONMENT=production
+    read_only: true
+    tmpfs:
+      - /tmp:size=512M
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+  # ── Valkey / Redis-compatible cache (production tuning) ───────────
+  redis:
+    # Production: consider Valkey/Redis Sentinel or Cluster for HA
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    command: >
+      valkey-server
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --no-appendfsync-on-rewrite yes
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --tcp-backlog 511
+      --timeout 300
+      --tcp-keepalive 60
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      --protected-mode yes
+      --loglevel notice
+
+  # ── PostgreSQL 16 (production tuning) ─────────────────────────────
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "max_connections=500"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "effective_cache_size=4GB"
+      - "-c"
+      - "work_mem=32MB"
+      - "-c"
+      - "wal_level=replica"
+      - "-c"
+      - "log_min_duration_statement=500"
+      - "-c"
+      - "log_checkpoints=on"
+      - "-c"
+      - "log_connections=on"
+      - "-c"
+      - "log_disconnections=on"
+      - "-c"
+      - "log_lock_waits=on"
+    ports: []  # Do NOT expose DB port in production
+
+  # ── MediScan VLM Engine (GPU — production) ────────────────────────
+  mediscan-vlm:
+    shm_size: '2g'
+    deploy:
+      resources:
+        limits:
+          cpus: "8.0"
+          memory: 24G
+        reservations:
+          cpus: "2.0"
+          memory: 8G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # ── Medical LLM Engine (GPU — production) ─────────────────────────
+  medical-llm:
+    shm_size: '2g'
+    deploy:
+      resources:
+        limits:
+          cpus: "8.0"
+          memory: 24G
+        reservations:
+          cpus: "2.0"
+          memory: 8G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # ── Prometheus (monitoring) ───────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - monitoring-net
+      - backend-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ── Grafana (dashboards) ──────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks:
+      - monitoring-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ── Additional Networks ────────────────────────────────────────────
+networks:
+  monitoring-net:
+    driver: bridge
+    name: medai-monitoring
+
+# ── Additional Volumes ─────────────────────────────────────────────
+volumes:
+  prometheus_data:
+    name: medai-prometheus-data
+  grafana_data:
+    name: medai-grafana-data

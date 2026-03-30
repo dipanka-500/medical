@@ -1,0 +1,203 @@
+# ═══════════════════════════════════════════════════════
+#  Medical LLM Engine — Pipeline Configuration
+# ═══════════════════════════════════════════════════════
+
+# ── Routing Configuration ──────────────────────────────
+routing:
+  min_models_per_task: 2
+  max_models_per_task: 6
+  enable_smart_routing: true     # Use BioMistral for ambiguous queries
+  routing_table:
+    simple_qa:
+      primary: ["biomistral_7b"]
+      verifier: []
+      reasoning: []
+    diagnosis:
+      primary: ["deepseek_r1", "openbiollm_70b"]
+      medical: ["meditron_70b"]
+      verifier: ["clinical_camel_70b", "med42_70b"]
+      reasoning: ["deepseek_r1"]
+    research:
+      primary: ["pmc_llama_13b"]
+      medical: ["openbiollm_70b"]
+      verifier: []
+      reasoning: []
+    conversational:
+      primary: ["mellama_13b", "chatdoctor"]
+      verifier: []
+      reasoning: []
+    drug_info:
+      primary: ["biomistral_7b"]
+      medical: ["openbiollm_70b"]
+      verifier: ["med42_70b"]
+      reasoning: []
+    emergency:
+      primary: ["deepseek_r1", "openbiollm_70b"]
+      medical: ["meditron_70b"]
+      verifier: ["clinical_camel_70b", "med42_70b"]
+      reasoning: ["deepseek_r1"]
+
+# ── RAG Configuration ─────────────────────────────────
+rag:
+  embedding_model: "BAAI/bge-large-en-v1.5"
+  vector_store: "qdrant"
+  persist_dir: "./data/rag/faiss_index"
+  qdrant_collection: "medical_rag"
+  qdrant_url: ""
+  chunk_size: 512
+  chunk_overlap: 64
+  top_k: 7
+  relevance_threshold: 0.55
+  enable_web_search: true
+  enable_pubmed: true
+  pubmed:
+    max_results: 10
+    email: "medllm@research.org"     # Required by NCBI
+    tool_name: "MedicalLLMEngine"
+    cache_dir: "./data/rag/pubmed_cache"
+  web_search:
+    provider: "searxng"
+    searxng_url: ""
+    timeout_seconds: 12
+    max_results: 5
+    medical_domains:
+      - "pubmed.ncbi.nlm.nih.gov"
+      - "who.int"
+      - "nih.gov"
+      - "mayoclinic.org"
+      - "radiopaedia.org"
+      - "uptodate.com"
+      - "nice.org.uk"
+      - "cochranelibrary.com"
+      - "medscape.com"
+      - "bmj.com"
+      - "thelancet.com"
+      - "nejm.org"
+      - "cdc.gov"
+      - "fda.gov"
+  search_architecture:
+    parallel_sources: 4
+    query_understanding:
+      max_rewrites: 5
+      preferred_sources:
+        - "vector_db"
+        - "pubmed"
+        - "guidelines"
+        - "web"
+        - "arxiv"
+    content_extraction:
+      enabled: true
+      timeout_seconds: 8
+      max_fetches: 3
+      max_chars: 6000
+    reranker:
+      enable_semantic_reranking: true
+      semantic_model: "BAAI/bge-reranker-large"
+      max_results: 8
+      trusted_domains:
+        - "pubmed.ncbi.nlm.nih.gov"
+        - "who.int"
+        - "nih.gov"
+        - "cdc.gov"
+        - "fda.gov"
+        - "nice.org.uk"
+        - "cochranelibrary.com"
+        - "bmj.com"
+        - "thelancet.com"
+        - "nejm.org"
+    context_builder:
+      max_context_chars: 6500
+      max_sources: 8
+      chunk_words: 180
+      chunk_overlap: 30
+    output_filter:
+      require_citations: true
+      min_trusted_sources: 1
+    cache:
+      max_size: 128
+      ttl_seconds: 600
+
+# ── Fusion Configuration ──────────────────────────────
+fusion:
+  strategy: "weighted_consensus"    # weighted_consensus | majority_vote | best_confidence
+  confidence_weights:
+    reasoning_score: 0.4
+    medical_score: 0.4
+    evidence_score: 0.2
+  agreement_threshold: 0.6
+  min_confidence: 0.3
+
+# ── Safety Configuration ──────────────────────────────
+safety:
+  enable_hallucination_check: true
+  enable_drug_interaction_check: true
+  enable_clinical_validation: true
+  enable_risk_flagging: true
+  max_hallucination_tolerance: 0.3
+  risk_levels:
+    emergent:
+      - "cardiac arrest"
+      - "stroke"
+      - "pulmonary embolism"
+      - "aortic dissection"
+      - "tension pneumothorax"
+      - "intracranial hemorrhage"
+      - "anaphylaxis"
+      - "septic shock"
+      - "status epilepticus"
+      - "acute myocardial infarction"
+    urgent:
+      - "fracture"
+      - "pneumonia"
+      - "appendicitis"
+      - "bowel obstruction"
+      - "deep vein thrombosis"
+      - "acute pancreatitis"
+      - "meningitis"
+      - "diabetic ketoacidosis"
+    routine:
+      - "chronic pain"
+      - "stable condition"
+      - "benign lesion"
+      - "degenerative changes"
+
+# ── Execution Configuration ───────────────────────────
+execution:
+  max_concurrent_models: 4
+  model_timeout_seconds: 300
+  enable_parallel: true
+  retry_on_failure: true
+  max_retries: 2
+  lazy_loading:
+    max_resident_models: 0
+    auto_unload_after_inference: false
+    sequential_heavy_models: false
+
+# ── Response Configuration ────────────────────────────
+response:
+  default_mode: "doctor"     # doctor | patient | research
+  include_evidence: true
+  include_confidence: true
+  include_reasoning: true
+  max_response_length: 4096
+  structured_sections:
+    - "diagnosis"
+    - "confidence"
+    - "evidence"
+    - "recommended_tests"
+    - "treatment_options"
+    - "risk_level"
+    - "doctor_advice"
+
+# ── Governance ────────────────────────────────────────
+governance:
+  audit:
+    enabled: true
+    enable_detailed: true
+    enable_console: false
+    log_dir: "./logs/audit"
+    retain_days: 365
+  explainability:
+    enabled: true
+    show_reasoning_chain: true
+    show_model_contributions: true

@@ -1,0 +1,26 @@
+# Exclude everything not needed by the platform service
+frontend/
+medical_llm/
+mediscan_v70_sota_production/
+document_ocr/
+.git/
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+node_modules/
+*.pth
+*.pt
+*.bin
+*.onnx
+*.safetensors
+data/
+logs/
+outputs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.idea/
+*.md

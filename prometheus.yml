@@ -1,0 +1,44 @@
+# Prometheus configuration for MediScan AI
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: "platform"
+    metrics_path: /api/v1/metrics
+    static_configs:
+      - targets: ["platform:8000"]
+        labels:
+          service: "platform-api"
+          environment: "production"
+
+  - job_name: "mediscan-vlm"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["mediscan-vlm:8001"]
+        labels:
+          service: "mediscan-vlm"
+          environment: "production"
+
+  - job_name: "medical-llm"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["medical-llm:8002"]
+        labels:
+          service: "medical-llm"
+          environment: "production"
+
+  - job_name: "mediscan-ocr"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["mediscan-ocr:8003"]
+        labels:
+          service: "mediscan-ocr"
+          environment: "production"
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          service: "prometheus"

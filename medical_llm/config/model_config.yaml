@@ -1,0 +1,134 @@
+# ═══════════════════════════════════════════════════════
+#  Medical LLM Engine — Model Configuration
+#  All models: FULL WEIGHTS, NO QUANTIZATION
+# ═══════════════════════════════════════════════════════
+#
+# LICENSING & SAFETY NOTES:
+#   - OpenBioLLM-70B: Research only. Model card explicitly advises
+#     against direct patient care or clinical decision support.
+#   - ClinicalCamel-70B: Research/non-commercial only. Forbids
+#     healthcare decision-making and commercial use.
+#   - ChatDoctor: Research release. Requires manual weight placement;
+#     not production-tested. Use for conversational prototyping only.
+#   - Me-LLaMA: Released by clinicalnlplab. Check license before
+#     commercial deployment.
+#   - DeepSeek-R1-Distill-Llama-70B: MIT license. Deployable variant.
+#
+# This system is for RESEARCH AND CLINICAL DECISION SUPPORT only.
+# It MUST NOT be used as the sole basis for clinical decisions.
+# ═══════════════════════════════════════════════════════
+
+defaults:
+  device_map: "auto"
+  torch_dtype: "bfloat16"
+  trust_remote_code: false    # SECURITY: only enable per-model when required
+  max_new_tokens: 4096
+  temperature: 0.3
+  top_p: 0.9
+  repetition_penalty: 1.15
+  do_sample: true
+  use_vllm: false          # Set true for vLLM backend
+
+models:
+  # ── Reasoning Engine ─────────────────────────────────
+  deepseek_r1:
+    # NOTE: Full DeepSeek-R1 (671B MoE) requires custom Transformers support.
+    # Use the official Llama-architecture distilled variant for standard
+    # AutoModelForCausalLM compatibility. Switch to deepseek-ai/DeepSeek-R1
+    # only when running with the official DeepSeek inference framework.
+    model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+    role: "reasoning"
+    description: "Primary reasoning engine with self-reflection (distilled)"
+    max_new_tokens: 8192
+    temperature: 0.6          # DeepSeek-R1 official docs: recommended 0.5-0.7
+    weight: 0.95
+    self_reflection_passes: 3   # 3-pass: reason → critique → refine
+    constraint_prompting: true
+
+  # ── Medical Knowledge Engines ────────────────────────
+  meditron_70b:
+    model_id: "epfl-llm/meditron-70b"
+    role: "medical_reasoning"
+    description: "Clinical reasoning specialist"
+    max_new_tokens: 4096
+    temperature: 0.3
+    weight: 0.90
+
+  mellama_13b:
+    # NOTE: The original Me-LLaMA lives under clinicalnlplab, not meta-llama
+    model_id: "clinicalnlplab/Me-LLaMA-13b"
+    role: "conversational"
+    description: "Conversational medical Q&A"
+    max_new_tokens: 2048
+    temperature: 0.5
+    weight: 0.75
+
+  pmc_llama_13b:
+    model_id: "axiong/PMC_LLaMA_13B"
+    role: "literature"
+    description: "Medical literature comprehension"
+    max_new_tokens: 4096
+    temperature: 0.3
+    weight: 0.72
+
+  openbiollm_70b:
+    model_id: "aaditya/Llama3-OpenBioLLM-70B"
+    role: "medical_reasoning"
+    description: "SOTA open-source medical LLM"
+    max_new_tokens: 4096
+    temperature: 0.3
+    weight: 0.92
+
+  # ── Clinical Validation Engines ──────────────────────
+  biomistral_7b:
+    model_id: "BioMistral/BioMistral-7B"
+    role: "fast_engine"
+    description: "Fast inference for routing and simple Q&A"
+    max_new_tokens: 2048
+    temperature: 0.3
+    weight: 0.70
+
+  clinical_camel_70b:
+    model_id: "wanglab/ClinicalCamel-70B"
+    role: "validator"
+    description: "Clinical safety validator"
+    max_new_tokens: 2048
+    temperature: 0.2
+    weight: 0.85
+
+  med42_70b:
+    model_id: "m42-health/Llama3-Med42-70B"
+    role: "validator"
+    description: "Secondary diagnostic validator"
+    max_new_tokens: 2048
+    temperature: 0.2
+    weight: 0.88
+
+  # ── Conversational Engine ────────────────────────────
+  chatdoctor:
+    model_id: "zl111/ChatDoctor"
+    role: "conversational"
+    description: "Patient-facing conversational assistant"
+    max_new_tokens: 1024
+    temperature: 0.6
+    weight: 0.65
+
+# ── Embedding Model ──────────────────────────────────
+embedding:
+  model_id: "BAAI/bge-large-en-v1.5"
+  device: "cuda"
+  batch_size: 64
+  normalize: true
+
+# ── Model Selection Priority ─────────────────────────
+# Higher weight = more trusted in fusion
+priority_order:
+  - deepseek_r1
+  - openbiollm_70b
+  - meditron_70b
+  - med42_70b
+  - clinical_camel_70b
+  - mellama_13b
+  - pmc_llama_13b
+  - biomistral_7b
+  - chatdoctor

@@ -1,0 +1,225 @@
+# ============================================================
+# MediScan AI v7.0 — Model Configuration (16 Models)
+# ============================================================
+# v7.0 ADDITIONS:
+#   Merlin (Stanford MIMI) — 3D CT specialist
+#   CheXagent-2 (Stanford AIMI) — Chest X-ray specialist
+#   PathGen-1.6B — Pathology specialist
+#   RETFound — Retinal foundation model
+#   RadFM — General radiology foundation model
+# ============================================================
+
+defaults:
+  torch_dtype: "bfloat16"
+  device_map: "auto"
+  trust_remote_code: true
+  max_new_tokens: 4096
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.9
+
+models:
+  # ── Hulu-Med Family ────────────────────────────────────────
+  hulu_med_7b:
+    model_id: "ZJU-AI4H/Hulu-Med-7B"
+    model_class: "AutoModelForCausalLM"
+    processor_class: "AutoProcessor"
+    attn_implementation: "flash_attention_2"
+    capabilities: ["text", "image", "multi_image", "3d_nifti", "video"]
+    supported_modalities: ["xray", "ct", "mri", "pathology", "ultrasound", "endoscopy", "dermoscopy", "fundoscopy", "video"]
+    use_think: true
+    priority: 1
+
+  hulu_med_14b:
+    model_id: "ZJU-AI4H/Hulu-Med-14B"
+    model_class: "AutoModelForCausalLM"
+    processor_class: "AutoProcessor"
+    attn_implementation: "flash_attention_2"
+    capabilities: ["text", "image", "multi_image", "3d_nifti", "video"]
+    supported_modalities: ["xray", "ct", "mri", "pathology", "ultrasound", "endoscopy", "dermoscopy", "fundoscopy", "video"]
+    use_think: true
+    priority: 2
+
+  hulu_med_32b:
+    model_id: "ZJU-AI4H/Hulu-Med-32B"
+    model_class: "AutoModelForCausalLM"
+    processor_class: "AutoProcessor"
+    attn_implementation: "flash_attention_2"
+    capabilities: ["text", "image", "multi_image", "3d_nifti", "video"]
+    supported_modalities: ["xray", "ct", "mri", "pathology", "ultrasound", "endoscopy", "dermoscopy", "fundoscopy", "video"]
+    use_think: true
+    priority: 3
+
+  # ── MedGemma Family ────────────────────────────────────────
+  medgemma_4b:
+    model_id: "google/medgemma-1.5-4b-it"
+    model_class: "AutoModelForImageTextToText"
+    processor_class: "AutoProcessor"
+    capabilities: ["text", "image"]
+    supported_modalities: ["xray", "ct", "mri", "pathology", "ultrasound", "dermoscopy", "fundoscopy"]
+    context_length: 128000
+    priority: 1
+
+  medgemma_27b:
+    model_id: "google/medgemma-27b-it"
+    model_class: "AutoModelForImageTextToText"
+    processor_class: "AutoProcessor"
+    capabilities: ["text", "image"]
+    supported_modalities: ["xray", "ct", "mri", "pathology", "ultrasound", "dermoscopy", "fundoscopy"]
+    context_length: 128000
+    priority: 2
+
+  # ── MediX-R1 Family ────────────────────────────────────────
+  medix_r1_2b:
+    model_id: "MBZUAI/MediX-R1-2B"
+    model_class: "AutoModelForImageTextToText"
+    processor_class: "AutoProcessor"
+    base_architecture: "Qwen3-VL-2B"
+    capabilities: ["text", "image"]
+    supported_modalities: ["xray", "ct", "mri", "pathology"]
+    reasoning_mode: true
+    priority: 1
+
+  medix_r1_8b:
+    model_id: "MBZUAI/MediX-R1-8B"
+    model_class: "AutoModelForImageTextToText"
+    processor_class: "AutoProcessor"
+    base_architecture: "Qwen3-VL-8B-Instruct"
+    capabilities: ["text", "image"]
+    supported_modalities: ["xray", "ct", "mri", "pathology"]
+    reasoning_mode: true
+    priority: 2
+
+  medix_r1_30b:
+    model_id: "MBZUAI/MediX-R1-30B"
+    model_class: "AutoModelForImageTextToText"
+    processor_class: "AutoProcessor"
+    base_architecture: "Qwen3-VL-30B-A3B-Instruct"
+    capabilities: ["text", "image"]
+    supported_modalities: ["xray", "ct", "mri", "pathology"]
+    reasoning_mode: true
+    priority: 3
+
+  # ── BiomedCLIP ─────────────────────────────────────────────
+  biomedclip:
+    model_id: "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
+    model_class: "open_clip"
+    capabilities: ["classification", "similarity", "verification"]
+    supported_modalities: ["xray", "ct", "mri", "pathology", "histopathology", "dermoscopy"]
+    context_length: 256
+    priority: 1
+
+  # ── Med3DVLM ──────────────────────────────────────────────
+  med3dvlm:
+    model_id: "MagicXin/Med3DVLM-Qwen-2.5-7B"
+    encoder_id: "MagicXin/DCFormer_SigLIP"
+    model_class: "AutoModelForCausalLM"
+    processor_class: "AutoProcessor"
+    capabilities: ["3d_nifti"]
+    supported_modalities: ["ct", "mri"]
+    image_size: [128, 256, 256]
+    max_length: 1024
+    priority: 1
+
+  # ── Merlin (Stanford MIMI — 3D CT) ────────────────── [NEW]
+  merlin:
+    model_id: "StanfordMIMI/Merlin"
+    model_class: "AutoModelForCausalLM"
+    processor_class: "AutoProcessor"
+    capabilities: ["3d_nifti"]
+    supported_modalities: ["ct"]
+    image_size: [32, 256, 256]
+    max_new_tokens: 2048
+    priority: 2
+
+  # ── CheXagent-2 (Stanford AIMI — Chest X-ray) ────── [NEW]
+  chexagent_8b:
+    model_id: "StanfordAIMI/CheXagent-2-8b"
+    model_class: "Qwen2_5_VLForConditionalGeneration"
+    processor_class: "AutoProcessor"
+    capabilities: ["image", "grounding"]
+    supported_modalities: ["xray"]
+    priority: 1
+
+  chexagent_3b:
+    model_id: "StanfordAIMI/CheXagent-2-3b"
+    model_class: "Qwen2_5_VLForConditionalGeneration"
+    processor_class: "AutoProcessor"
+    capabilities: ["image", "grounding"]
+    supported_modalities: ["xray"]
+    priority: 2
+
+  # ── PathGen-1.6B (Pathology) ──────────────────────── [NEW]
+  pathgen:
+    model_id: "PathGen/PathGen-1.6B"
+    model_class: "LlavaForConditionalGeneration"
+    processor_class: "AutoProcessor"
+    capabilities: ["image"]
+    supported_modalities: ["pathology", "cytology", "histopathology"]
+    priority: 1
+
+  # ── RETFound (Retinal Foundation Model) ───────────── [NEW]
+  retfound:
+    model_id: "TJU-DRL-LAB/RETFound"
+    model_class: "ViTModel"
+    capabilities: ["classification", "feature_extraction"]
+    supported_modalities: ["fundoscopy", "oct"]
+    priority: 1
+
+  # ── RadFM (General Radiology) ─────────────────────── [NEW]
+  radfm:
+    model_id: "chaoyi-wu/RadFM"
+    model_class: "AutoModelForCausalLM"
+    processor_class: "AutoProcessor"
+    capabilities: ["image", "3d_nifti"]
+    supported_modalities: ["xray", "ct", "mri"]
+    max_new_tokens: 2048
+    priority: 2
+
+# ── Model Ensembles ──────────────────────────────────────────
+ensembles:
+  chest_xray:
+    primary: "chexagent_8b"
+    secondary: "medgemma_4b"
+    verifier: "biomedclip"
+    reasoner: "medix_r1_8b"
+    generalist: "radfm"
+
+  ct_scan:
+    primary: "hulu_med_14b"
+    specialist_3d: "med3dvlm"
+    specialist_ct: "merlin"
+    verifier: "biomedclip"
+    reasoner: "medix_r1_8b"
+    generalist: "radfm"
+
+  mri_scan:
+    primary: "hulu_med_14b"
+    specialist_3d: "med3dvlm"
+    secondary: "medgemma_4b"
+    verifier: "biomedclip"
+    reasoner: "medix_r1_8b"
+
+  pathology:
+    primary: "pathgen"
+    secondary: "medgemma_4b"
+    verifier: "biomedclip"
+    reasoner: "medix_r1_8b"
+
+  fundoscopy:
+    primary: "medgemma_4b"
+    specialist: "retfound"
+    secondary: "hulu_med_7b"
+    verifier: "biomedclip"
+    reasoner: "medix_r1_8b"
+
+  general_medical:
+    primary: "hulu_med_7b"
+    secondary: "medgemma_4b"
+    verifier: "biomedclip"
+    reasoner: "medix_r1_8b"
+    generalist: "radfm"
+
+  video_analysis:
+    primary: "hulu_med_7b"
+    reasoner: "medix_r1_2b"

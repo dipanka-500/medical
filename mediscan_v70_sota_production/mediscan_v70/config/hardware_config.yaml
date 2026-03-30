@@ -1,0 +1,56 @@
+# ============================================================
+# MediScan AI v5.0 — Hardware Configuration
+# ============================================================
+
+gpu:
+  # Auto-detect available GPUs
+  auto_detect: true
+  # Preferred device map strategy: auto | balanced | sequential
+  device_map_strategy: "auto"
+  # Memory fraction to use per GPU (0.0 - 1.0)
+  max_memory_fraction: 0.90
+  # Enable CUDA memory caching
+  memory_efficient: true
+  # Flash Attention 2 (requires Ampere+ GPU)
+  flash_attention: true
+
+compute:
+  # Default dtype for all models (full precision)
+  default_dtype: "bfloat16"
+  # Enable torch.compile for faster inference
+  torch_compile: false
+  # Inference mode
+  inference_mode: true
+  # Gradient checkpointing (for large models)
+  gradient_checkpointing: false
+
+memory:
+  # Max CPU RAM for model loading (GB)
+  max_cpu_memory_gb: 64
+  # Enable model offloading to CPU when GPU OOM
+  cpu_offload: true
+  # Enable disk offloading as last resort
+  disk_offload: false
+  disk_offload_dir: "./offload"
+
+parallel:
+  # Max concurrent model inferences
+  max_concurrent_models: 3
+  # Thread pool size for async operations
+  thread_pool_size: 8
+  # Process pool size for CPU-bound preprocessing
+  process_pool_size: 4
+
+lazy_loading:
+  max_resident_models: 0
+  auto_unload_after_inference: false
+  sequential_heavy_models: false
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  reload: false
+  log_level: "info"
+  cors_origins: ["http://localhost:3000", "http://localhost:8080"]
+  max_upload_size_mb: 500

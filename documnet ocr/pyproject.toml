@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mediscan-ocr-x"
+version = "0.1.0"
+description = "Adaptive OCR pipeline with routing, handwriting detection, and Sarvam Vision integration."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "MediScan OCR Team" }
+]
+dependencies = [
+  "fastapi>=0.100,<1.0",
+  "httpx>=0.24,<1.0",
+  "numpy>=1.22",
+  "opencv-python>=4.7",
+  "Pillow>=9.0",
+  "pydantic>=2.0,<3.0",
+  "python-multipart>=0.0.5",
+  "uvicorn>=0.20",
+]
+
+[project.optional-dependencies]
+gpu = [
+  "torch>=2.0",
+  "torchvision>=0.15",
+]
+# 0.2.x is not published yet; keep the optional integration on the latest
+# available 0.1.x line so the extra remains installable when enabled.
+sarvam = ["sarvamai>=0.1.27,<0.2"]
+docsplit = ["pypdfium2>=4.30"]
+granite = [
+  "torch>=2.0",
+  "transformers>=4.57",
+  "peft>=0.18",
+  "pillow>=12.0",
+]
+dev = [
+  "pytest>=7.0",
+  "pytest-asyncio>=0.21",
+]
+
+[project.scripts]
+mediscan-ocr = "medicscan_ocr.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["medicscan_ocr*"]
